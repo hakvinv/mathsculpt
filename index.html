@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mathsculpt</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:100%; height:100%; background:#000; overflow:hidden; color:#fff; font-family:'Courier New',monospace; }
+#c { position:fixed; top:0; left:0; width:100%; height:100%; display:block; }
+#ui { position:fixed; top:24px; left:24px; display:flex; flex-direction:column; gap:14px; z-index:10; }
+#title { font-size:13px; letter-spacing:.15em; color:#888; text-transform:uppercase; }
+#sub { font-size:11px; color:#444; letter-spacing:.1em; margin-top:2px; }
+.param { display:flex; flex-direction:column; gap:4px; }
+.param label { font-size:10px; color:#555; letter-spacing:.12em; text-transform:uppercase; }
+.param input[type=range] { width:140px; accent-color:#fff; background:transparent; cursor:pointer; }
+.val { font-size:11px; color:#888; }
+select { background:#000; color:#666; border:1px solid #222; font-family:'Courier New',monospace; font-size:11px; padding:4px 8px; cursor:pointer; }
+#hint { position:fixed; bottom:24px; left:24px; font-size:10px; color:#333; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div><div id="title">mathsculpt</div><div id="sub">drag to rotate</div></div>
+  <select id="sel"><option value="lorenz">Lorenz</option><option value="rossler">Rossler</option><option value="halvorsen">Halvorsen</option></select>
+  <div class="param"><label>sigma / a</label><input type="range" id="p1" min="1" max="28" step=".1" value="10"><span class="val" id="p1v">10</span></div>
+  <div class="param"><label>rho / b</label><input type="range" id="p2" min="1" max="50" step=".1" value="28"><span class="val" id="p2v">28</span></div>
+  <div class="param"><label>beta / c</label><input type="range" id="p3" min=".1" max="10" step=".01" value="2.67"><span class="val" id="p3v">2.67</span></div>
+  <div class="param"><label>colormap</label><select id="cm"><option value="plasma">plasma</option><option value="cool">cool</option><option value="fire">fire</option><option value="mono">mono</option></select></div>
+</div>
+<div id="hint">hakvinv / mathsculpt</div>
+<script>
+window.onload=function(){
+var C=document.getElementById('c');
+C.width=window.innerWidth;C.height=window.innerHeight;
+var gl=C.getContext('webgl')||C.getContext('experimental-webgl');
+if(!gl){document.body.innerHTML='<p style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#555">webgl unavailable</p>';return;}
+window.onresize=function(){C.width=window.innerWidth;C.height=window.innerHeight;gl.viewport(0,0,C.width,C.height);};
+gl.viewport(0,0,C.width,C.height);
+function sh(t,s){var x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);return x;}
+var vs=sh(gl.VERTEX_SHADER,'attribute vec3 p;attribute vec3 k;uniform mat4 m;varying vec3 v;void main(){gl_Position=m*vec4(p,1.);v=k;}');
+var fs=sh(gl.FRAGMENT_SHADER,'precision mediump float;varying vec3 v;void main(){gl_FragColor=vec4(v,.9);}');
+var prog=gl.createProgram();gl.attachShader(prog,vs);gl.attachShader(prog,fs);gl.linkProgram(prog);gl.useProgram(prog);
+var AP=gl.getAttribLocation(prog,'p'),AK=gl.getAttribLocation(prog,'k'),UM=gl.getUniformLocation(prog,'m');
+function cmap(t,n){t=Math.max(0,Math.min(1,t));if(n==='plasma')return[.5+.5*Math.sin(t*5),.2+.3*Math.sin(t*4-1),.8-.6*t];if(n==='cool')return[.1+.2*t,.4+.4*t,1-.4*t];if(n==='fire')return[Math.min(1,t*2.5),Math.max(0,t*2-.6),Math.max(0,(t-.85)*6)];var v=.15+t*.7;return[v,v,v];}
+function sim(type,a,b,c){var N=80000,dt=.005,pts=new Float32Array(N*3),x=.1,y=0,z=0;for(var i=0;i<N;i++){var dx,dy,dz;if(type==='lorenz'){dx=a*(y-x);dy=x*(b-z)-y;dz=x*y-c*z;}else if(type==='rossler'){dx=-y-z;dy=x+a*y;dz=b+z*(x-c);}else{dx=-a*x-4*y-4*z-y*y;dy=-a*y-4*z-4*x-z*z;dz=-a*z-4*x-4*y-x*x;}x+=dx*dt;y+=dy*dt;z+=dz*dt;pts[i*3]=x;pts[i*3+1]=y;pts[i*3+2]=z;}return pts;}
+function build(pts,cn){var N=pts.length/3,xn=1e9,xx=-1e9,yn=1e9,yx=-1e9,zn=1e9,zx=-1e9;for(var i=0;i<N;i++){if(pts[i*3]<xn)xn=pts[i*3];if(pts[i*3]>xx)xx=pts[i*3];if(pts[i*3+1]<yn)yn=pts[i*3+1];if(pts[i*3+1]>yx)yx=pts[i*3+1];if(pts[i*3+2]<zn)zn=pts[i*3+2];if(pts[i*3+2]>zx)zx=pts[i*3+2];}var sc=1.8/Math.max(xx-xn,yx-yn,zx-zn),cx=(xx+xn)/2,cy=(yx+yn)/2,cz=(zx+zn)/2,vv=new Float32Array(N*3),kk=new Float32Array(N*3);for(var i=0;i<N;i++){vv[i*3]=(pts[i*3]-cx)*sc;vv[i*3+1]=(pts[i*3+1]-cy)*sc;vv[i*3+2]=(pts[i*3+2]-cz)*sc;var c=cmap(i/N,cn);kk[i*3]=c[0];kk[i*3+1]=c[1];kk[i*3+2]=c[2];}var vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,vv,gl.STATIC_DRAW);var kb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,kb);gl.bufferData(gl.ARRAY_BUFFER,kk,gl.STATIC_DRAW);return{vb:vb,kb:kb,n:N};}
+function mul(a,b){var r=new Float32Array(16);for(var i=0;i<4;i++)for(var j=0;j<4;j++)for(var k=0;k<4;k++)r[i*4+j]+=a[i*4+k]*b[k*4+j];return r;}
+function rx(a){var c=Math.cos(a),s=Math.sin(a);return new Float32Array([1,0,0,0,0,c,-s,0,0,s,c,0,0,0,0,1]);}
+function ry(a){var c=Math.cos(a),s=Math.sin(a);return new Float32Array([c,0,s,0,0,1,0,0,-s,0,c,0,0,0,0,1]);}
+function pr(f,a,n,fa){var t=1/Math.tan(f/2);return new Float32Array([t/a,0,0,0,0,t,0,0,0,0,(fa+n)/(n-fa),-1,0,0,2*fa*n/(n-fa),0]);}
+function tr(z){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,z,1]);}
+var rotx=.3,roty=.4,drag=false,lx,ly,auto=true,buf=null;
+C.addEventListener('mousedown',function(e){drag=true;lx=e.clientX;ly=e.clientY;auto=false;});
+window.addEventListener('mouseup',function(){drag=false;});
+window.addEventListener('mousemove',function(e){if(!drag)return;roty+=(e.clientX-lx)*.005;rotx+=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY;});
+function rebuild(){buf=build(sim(document.getElementById('sel').value,parseFloat(document.getElementById('p1').value),parseFloat(document.getElementById('p2').value),parseFloat(document.getElementById('p3').value)),document.getElementById('cm').value);}
+['sel','p1','p2','p3','cm'].forEach(function(id){document.getElementById(id).addEventListener('input',function(){['p1','p2','p3'].forEach(function(p){document.getElementById(p+'v').textContent=document.getElementById(p).value;});rebuild();});});
+rebuild();
+gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.clearColor(0,0,0,1);
+function frame(t){requestAnimationFrame(frame);if(!buf)return;if(auto)roty=t*.0003;gl.clear(gl.COLOR_BUFFER_BIT);var mvp=mul(pr(1,C.width/C.height,.1,100),mul(tr(-3.5),mul(ry(roty),rx(rotx))));gl.uniformMatrix4fv(UM,false,mvp);gl.bindBuffer(gl.ARRAY_BUFFER,buf.vb);gl.enableVertexAttribArray(AP);gl.vertexAttribPointer(AP,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,buf.kb);gl.enableVertexAttribArray(AK);gl.vertexAttribPointer(AK,3,gl.FLOAT,false,0,0);gl.drawArrays(gl.LINE_STRIP,0,buf.n);}
+requestAnimationFrame(frame);};
+</script>
+</body>
+</html>
