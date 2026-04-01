@@ -54,7 +54,7 @@ def integrate(fn, x0=0.1, y0=0.0, z0=0.0):
                 xs.append(x)
                 ys.append(y)
                 zs.append(z)
-            return np.array(xs), np.array(ys), np.array(zs)
+      return np.array(xs), np.array(ys), np.array(zs)
 
 
 fn = lorenz if ATTRACTOR == "lorenz" else rossler
