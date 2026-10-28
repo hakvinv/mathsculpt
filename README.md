@@ -55,4 +55,3 @@ The scripts write an image to the working directory and open a Matplotlib window
 | [`strange_attractor.py`](strange_attractor.py) | Lorenz or Rössler system, parameters, step size, and color map |
 
 The web explorer is a separate interactive visualization in [`index.html`](index.html). It includes Lorenz, Rössler, and Halvorsen systems.
-
